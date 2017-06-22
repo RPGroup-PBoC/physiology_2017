@@ -39,19 +39,27 @@ function gatedf = unsupervised_gating(df, frac, nbins, xVal, yVal, logScale)
     
     % Compute the 2D histogram keeping track of the bin counts and the
     % coordinates at which these bins exist
-    [number, center] = hist3([x y], nbins);
-    
+%     [number, center] = hist3([x y], nbins);
+
+    [number xEdge yEdge] = histcounts2(x, y, nbins);
     % extract the center of the bins into reasonable variables
-    xCenter = [center{1}];
-    yCenter = [center{2}];
+    
+%     xCenter = [center{1}];
+%     yCenter = [center{2}];
 
     % Find non-zerio elements of the histogram to speed up the calculation.
     [nRow, nCol, nValue] = find(number);
 
     % Generate data frame with the x and y coordinate along with the bin
     % count for the non-zero bins
-    dfSort = table(xCenter(nRow)', yCenter(nCol)', nValue,...
-                    'VariableNames', {xVal yVal 'count'});
+%     dfSort = table(xEdge(nRow)', yEdge(nCol)', nValue,...
+%                     'VariableNames', {xVal yVal 'count'});
+    dfSort = table(xEdge(nRow)', xEdge(nRow + 1)',...
+                   yEdge(nCol)', yEdge(nCol + 1)', nValue,...
+                    'VariableNames', {'xvalmin' 'xvalmax' 'yvalmin'...
+                                      'yvalmax', 'count'});
+
+
 
     % Sort the data frame by the bin count
     dfSort = sortrows(dfSort, 'count', 'descend');
@@ -60,10 +68,10 @@ function gatedf = unsupervised_gating(df, frac, nbins, xVal, yVal, logScale)
     dfSort.cumfrac = cumsum(dfSort.count) / sum(dfSort.count);
     
     % define the inter-bin distance
-    xbinDist = diff(x);
-    xbinDist = xbinDist(1);
-    ybinDist = diff(y);
-    ybinDist = ybinDist(1);
+%     xbinDist = diff(x);
+%     xbinDist = xbinDist(1);
+%     ybinDist = diff(y);
+%     ybinDist = ybinDist(1);
     
     % Generate boolean array to know which bins to keep
     binsToKeep = dfSort.cumfrac <= frac;
@@ -77,12 +85,17 @@ function gatedf = unsupervised_gating(df, frac, nbins, xVal, yVal, logScale)
     % generate a for loop to loop through each of the bins
     for i=1:height(dfKept)
         % Generate the box boundaries
-        xcent = table2array(dfKept(i, xVal));
-        ycent = table2array(dfKept(i, yVal));
-        xbin = [xcent - (xbinDist / 2); xcent + (xbinDist / 2)];
-        ybin = [ycent - (ybinDist / 2); ycent + (ybinDist / 2)];
+        xmin = table2array(dfKept(i, 'xvalmin'));
+        xmax = table2array(dfKept(i, 'xvalmax'));
+        ymin = table2array(dfKept(i, 'yvalmin'));
+        ymax = table2array(dfKept(i, 'yvalmax'));
+%         xcent = table2array(dfKept(i, xVal));
+%         ycent = table2array(dfKept(i, yVal));
+%         xbin = [xcent - (xbinDist / 2); xcent + (xbinDist / 2)];
+%         ybin = [ycent - (ybinDist / 2); ycent + (ybinDist / 2)];
         % Find which data points are inside the box
-        inBox = inpolygon(x, y, xbin, ybin);
+%         [inBox, outbox] = inpolygon(x, y, xbin, ybin);
+        inBox = x > xmin & x < xmax & y > ymin & y < ymax;
         % update the boolean array to know which data passed the filter
         idx = idx | inBox;
     end %for
