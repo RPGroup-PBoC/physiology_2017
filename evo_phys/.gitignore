@@ -55,4 +55,9 @@ graphicspath.tex
 *.ipynb_checkpoints*
 
 #Ignore local copies of the raw data
-*/data/
+/data/flow/*
+/data/microscopy/*
+/data/mcmc/*
+/data/misc/*
+doc/induction_paper/graphicspath.tex
+code/analysis/2016-06-11 Stephanie FACS Analysis.nb
