@@ -53,6 +53,7 @@ graphicspath.tex
 #Ignore various code garbage.
 *.pyc
 *.ipynb_checkpoints*
+*.m~
 
 #Ignore local copies of the raw data
 */data/
