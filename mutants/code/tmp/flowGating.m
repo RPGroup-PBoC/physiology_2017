@@ -1,5 +1,5 @@
 % Point at directory containing the data
-csvDir = '../data/csv/';
+csvDir = '../../data/csv/';
 
 % Next we list all the csv files contain in csvDir
 files = dir([csvDir '*.csv'])
@@ -12,8 +12,7 @@ df = readtable([csvDir files(7).name]);
 df.logFSC = log(df.FSC_H);
 df.logSSC = log(df.SSC_H);
 
-df(1:3, :)
-
+df(1:2, :)
 %%
 
 % Let's look at the front and side scattering
@@ -32,125 +31,116 @@ xlabel('Front scattering (a.u.)')
 ylabel('Side scattering (a.u.')
 
 %%
+% Let's try instead in log scale
 scatplot(df.logFSC, df.logSSC)
-xlabel('Front scattering (a.u.)')
-ylabel('Side scattering (a.u.')
+xlabel('log front scattering (a.u.)')
+ylabel('log side scattering (a.u.')
+
+
 %%
 
-% Victoria wants to make my life very hard. Challenge accepted!
-
 % Save my data as log of the data
-logdf = table2array(df(:, {'logFSC', 'logSSC'}));
-
+% logdf = table2array(df(:, {'logFSC', 'logSSC'}));
+x = table2array(df(:, 'logFSC'));
+y = table2array(df(:, 'logSSC'));
 %%
 
 % Let's plot a 3d histogram because again Victoria is making my life hard
-hist3(logdf, [50, 50])
+hist3([x y], [50 50])
 
 %%
+% Compute the 2D histogram keeping track of the bin counts and the
+% coordinates at which these bins exist
+[number xEdge yEdge] = histcounts2(x, y, [100 100]);
 
 % Make a 2D histogram to bin the data
-[number, center] = hist3(logdf, [50 50]);
-pcolor(center{1}, center{2}, number')
+pcolor(number')
 ylabel('side scattering')
 xlabel('front scattering')
-
 %%
-% extract the center of the bins into reasonable variables
-fscCenter = [center{1}];
-sscCenter = [center{2}];
-
 % Find non-zerio elements of the histogram to speed up the calculation.
 [nRow, nCol, nValue] = find(number);
-
-
-% Initialize data frame to save coordinates and bin count
-% sortdf = zeros([length(fscCenter) * length(sscCenter), 4]);
-sortdf = zeros([length(nValue), 4]);
+   
 
 %%
-for i=1:length(nValue)
-    % Add the fsc and ssc value to the sortdf array
-        sortdf(i, 1) = fscCenter(nRow(i));
-        sortdf(i, 2) = sscCenter(nCol(i));
-        % Add the bin count
-        sortdf(i, 3) = nValue(i);
-        % Add the fraction of data that each bin contains
-        sortdf(i, 4) = nValue(i) / sum(nValue);
-end %for
+% Generate data frame with the x and y box coordinate along with the 
+% bin count for the non-zero bins
+
+% Initialize array to save xmin, xmax, ymin, ymax and the bin count
+bins = zeros([length(nRow), 5]);
+
+% save xmin
+bins(:, 1) = xEdge(nRow);
+
+% save xmax
+bins(:, 2) = xEdge(nRow + 1);
+
+% save ymin
+bins(:, 3) = yEdge(nCol);
+
+% save ymax
+bins(:, 4) = yEdge(nCol + 1);
+
+% save the bin counts
+bins(:, 5) = nValue;
+
+% Let's convert bins into a fancy table with headers
+dfSort = array2table(bins, 'VariableName',...
+                    {'xmin' 'xmax' 'ymin' 'ymax' 'count'})
+
+
+
+% dfSort = table(xEdge(nRow)', xEdge(nRow + 1)',...
+%                yEdge(nCol)', yEdge(nCol + 1)', nValue,...
+%                 'VariableNames', {'xvalmin' 'xvalmax' 'yvalmin'...
+%                                   'yvalmax', 'count'});
 
 %%
-% initialize a counter
-% counter = 1;
-% for i=1:length(fscCenter)
-%     for j=1:length(sscCenter)
-%         % Add the fsc and ssc value to the sortdf array
-%         sortdf(counter, 1) = fscCenter(i);
-%         sortdf(counter, 2) = sscCenter(j);
-%         % Add the bin count
-%         sortdf(counter, 3) = number(i, j);
-%         % Add the fraction of data that each bin contains
-%         sortdf(counter, 4) = number(i, j) / sum(number(:));
-%         % increase counter
-%         counter = counter + 1;
-%     end % for 2
-% end %for 1
+% Sort the data frame by the bin count
+dfSort = sortrows(dfSort, 'count', 'descend');
+
+% Add column with cumulative fraction of data
+dfSort.cumfrac = cumsum(dfSort.count) / sum(dfSort.count);
 
 %%
-% Convert sortdf array into a nice looking table
-dfsort = array2table(sortdf, 'VariableNames',...
-                    {'FSC', 'SSC', 'count', 'fraction'});
-                
-[dfsort, index] = sortrows(dfsort, 'fraction', 'descend');
-dfsort.index = index;
-
-%%
-% Add column with the cumulative fraction
-dfsort.cumfrac = cumsum(dfsort.fraction);
-
-%%
-% Let's find the inter-bin distance
-xbinDist = diff(fscCenter);
-xbinDist = xbinDist(1);
-ybinDist = diff(sscCenter);
-ybinDist = ybinDist(1);
-
-%%
-% Let's keep the bins that have Victoria% or less of the data
-percent = 0.3;
+% Define fraction of the data I want to keep.
+frac = 0.4;
 
 % Generate boolean array to know which bins to keep
-binsToKeep = dfsort.cumfrac <= percent;
+binsToKeep = dfSort.cumfrac <= frac;
 
-% Keep only the bins that satisfied Victorias condition
-dfKept = dfsort(binsToKeep, :);
-
-%%
-% Now we will loop through each of the bins that we kept and we will find
-% which data points fall inside these bins
+% Keep only the bins that satisfied the percentage condition
+dfKept = dfSort(binsToKeep, :);
 
 % Initialize an array to keep track of which data points we will keep
 idx = zeros([height(df), 1]);
 
+%%
 % generate a for loop to loop through each of the bins
 for i=1:height(dfKept)
     % Generate the box boundaries
-    xbin = [dfKept(i, :).FSC - xbinDist / 2, dfKept(i, :).FSC + xbinDist / 2];
-    ybin = [dfKept(i, :).SSC - ybinDist / 2, dfKept(i, :).SSC + ybinDist / 2];
-    % Find which data points are inside the box
-    [inBox, on] = inpolygon(df.logFSC, df.logSSC, xbin, ybin);
+    xmin = table2array(dfKept(i, 'xmin'));
+    xmax = table2array(dfKept(i, 'xmax'));
+    ymin = table2array(dfKept(i, 'ymin'));
+    ymax = table2array(dfKept(i, 'ymax'));
+    
+    % Check which data points fall inside the box
+    inBox = x > xmin & x < xmax & y > ymin & y < ymax;
     % update the boolean array to know which data passed the filter
     idx = idx | inBox;
 end %for
 
 %%
+% apply gate
+gatedf = df(idx, :);
 
-gatedf = unsupervised_gating(df, 0.01, [500 500], 'FSC_H', 'SSC_H', true);
+%%
+
+% gatedf = unsupervised_gating(df, 0.01, [500 500], 'FSC_H', 'SSC_H', true);
 
 scatplot(df.logFSC, df.logSSC)
 hold on
-scatter(log(gatedf.FSC_H), log(gatedf.SSC_H), 'r')
-% set(gca, 'xscale', 'log', 'yscale', 'log')
+scatter(log(gatedf.FSC_H), log(gatedf.SSC_H), 'r.')
 xlabel('Front scattering (a.u.)')
 ylabel('Side scattering (a.u.)')
 hold off

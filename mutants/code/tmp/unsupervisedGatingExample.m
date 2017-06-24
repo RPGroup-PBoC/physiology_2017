@@ -3,7 +3,7 @@
 % flow cytometer
 
 % First thing is to point at the directory where the CSV data files exist
-csvDir = '../data/20170620_competition/csv/';
+csvDir = '../../data/fcs/20170620_r1_O2_R1220_uMIPTG.fcs';
 
 % Next we are going to list all the files in that directory
 files = dir([csvDir '*csv']);
